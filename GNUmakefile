@@ -6,10 +6,10 @@ OCAMLBUILD := ocamlbuild -quiet
 all: bindlib.cma bindlib.cmxa
 
 bindlib.cma: bindlib.mli bindlib.ml
-	$(OCAMLBUILD) -cflags -w,A $@
+	$(OCAMLBUILD) -cflags -w,A-4 $@
 
 bindlib.cmxa: bindlib.mli bindlib.ml
-	$(OCAMLBUILD) -cflags -w,A $@
+	$(OCAMLBUILD) -cflags -w,A-4 $@
 
 ## Examples
 EXAMPLES = examples/lambda.native examples/translate.native \
