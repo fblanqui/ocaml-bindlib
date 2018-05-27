@@ -1,7 +1,7 @@
 VERSION    := 4.0.5
 OCAMLFIND  := ocamlfind
 OCAMLBUILD := ocamlbuild -quiet
-CFLAGS     := -cflags -w,A
+CFLAGS     := -cflags -w,A-4
 DFLAGS     := -docflags -charset,utf-8,-short-functors
 
 ## Compilation
