@@ -3,7 +3,8 @@
     containing a binding structure (e.g., abstract syntax trees).
 
     @author Christophe Raffalli
-    @author Rodolphe Lepigre *)
+    @author Rodolphe Lepigre
+    @version 5.0 *)
 
 
 (** {2 Variables, binders and substitution} *)
@@ -38,14 +39,15 @@ type ('a,'b) mbinder
       | Abs of (term, term) binder
       | App of term * term ]} *)
 
-(** [subst b v] substitutes (using application) the variable bound by [b] with
-    the value [b]. This is a very efficient operations. *)
+(** [subst b v] substitutes the variable bound by [b] with the value [v]. This
+    is a very efficient operation. *)
 val subst  : ('a,'b) binder -> 'a -> 'b
 
-(** [msubst b vs] substitutes (using application) the array of variables bound
-    by [b] with the values [vs]. This is a very efficient operations. However,
-    the length of the [vs] array should match the arity of the binder (see the
-    function [mbinder_arity]). *)
+(** [msubst b vs] substitutes the variables bound by [b] with the values [vs].
+    This is a very efficient operation. Note that the length of the [vs] array
+    should match the arity of the multiple binder [b] (it can be obtained with
+    [mbinder_arity]). If that is not the case, the exception [Invalid_argument
+    "Bad arity in msubst"] is raised. *)
 val msubst : ('a,'b) mbinder -> 'a array -> 'b
 
 (** Comming back to our lambda-calculus example,  we can define the evaluation
@@ -85,31 +87,49 @@ val name_of  : 'a var  -> string
 (** [names_of xs] returns printable names for the variables of [xs]. *)
 val names_of : 'a mvar -> string array
 
-(** [unbind b] breaks the binder [b] into a pair of a variable and a body. The
-    name of the variable is based on that of the binder. *)
+(** [unbind b] substitutes the binder [b] using a fresh variable. The variable
+    and the result of the substitution are returned. Note that the name of the
+    fresh variable is based on that of the binder.  The [mkfree] function used
+    to create the fresh variable is that of the variable that was bound by [b]
+    at its construction (see [new_var] and [bind_var]). *)
 val unbind : ('a,'b) binder -> 'a var * 'b
 
 (** [unbind2 f g] is similar to [unbind f], but it substitutes two binders [f]
-    and [g] at once, using the same fresh variable. *)
+    and [g] at once using the same fresh variable. The name of the variable is
+    based on that of the binder [f]. Similarly, the [mkfree] syntactic wrapper
+    that is used for the fresh variable is the one that was given for creating
+    the variable that was bound to construct [f] (see [bind_var] and [new_var]
+    for details on this process). In particular, the use of [unbind2] may lead
+    to unexpected results if the binders [f] and [g] were not built using free
+    variables created with the same [mkfree]. *)
 val unbind2 : ('a,'b) binder -> ('a,'c) binder -> 'a var * 'b * 'c
 
 (** [eq_binder eq f g] tests the equality between [f] and [g]. The binders are
-    first substituted with the same fresh variable,  and [eq] is called on the
-    resulting terms. *)
+    first substituted with the same fresh variable (using [unbind2]), and [eq]
+    is called on the resulting values.  Note that [eq_binder] may not have the
+    expected result if [f] and [g] were not built by binding variables with an
+    identical [mkfree] syntactic wrapper. *)
 val eq_binder : ('b -> 'b -> bool) -> ('a,'b) binder -> ('a,'b) binder -> bool
 
-(** [unmbind b] breaks down the binder [b] into an array of variables, and the
-    term in which these variables are now free. The name of the variables that
-    are created are based on the bound variable names. *)
+(** [unmbind b] substitutes the multiple binder [b] with fresh variables. This
+    function is analogous to [unbind] for binders. Note that the names used to
+    create the fresh variables are based on those of the multiple binder.  The
+    syntactic wrapper (of [mkfree]) that is used to build the variables is the
+    one that was given when creating the multiple variables that were bound in
+    [b] (see [new_mvar] and [bind_mvar]). *)
 val unmbind : ('a,'b) mbinder -> 'a mvar * 'b
 
-(** [unmbind2 f g] is similar to [unmbind f],  but it substitutes both [f] and
-    [g] using the same fresh variables. *)
+(** [unmbind2 f g] is similar to [unmbind f],  but it substitutes two multiple
+    binder [f] and [g] at once, using the same fresh variables.  This function
+    may have an unexpected results in some cases, for reasons explained in the
+    documentation of [unbind2]. *)
 val unmbind2 : ('a,'b) mbinder -> ('a,'c) mbinder -> 'a mvar * 'b * 'c
 
-(** [eq_mbinder eq f g] tests the equality between two [mbinder] [f] and  [g].
-    They are first substituted with the same fresh variables, and then [eq] is
-    called on the resulting terms. *)
+(** [eq_mbinder eq f g] tests the equality of the two multiple binders [f] and
+    [g]. They are substituted with the same fresh variables (using [unmbind2])
+    and [eq] is called on the resulting values. This function may not have the
+    expected result in some cases,  for reasons explained in the documentation
+    of [eq_binder]. *)
 val eq_mbinder : ('b -> 'b -> bool) -> ('a,'b) mbinder -> ('a,'b) mbinder
   -> bool
 
@@ -120,15 +140,14 @@ val eq_mbinder : ('b -> 'b -> bool) -> ('a,'b) mbinder -> ('a,'b) mbinder
       match t with
       | Var(x)   -> name_of x
       | Abs(b)   -> let (x,t) = unbind b in
-                    "\\" ^ name_of x ^ "." ^ to_string t
+                    "λ" ^ name_of x ^ "." ^ to_string t
       | App(t,u) -> "(" ^ to_string t ^ ") " ^ to_string u ]} *)
 
 
 (** {2 Constructing terms and binders in the binding box} *)
 
 
-(** One of the main design priciple of the [Bindlib] library is efficiency. To
-    obtain very fast substitutions, a price is paid at the construction of the
+(** To obtain fast substitutions,  a price must be paid at the construction of
     terms. Indeed,  binders (i.e., element of type [('a,'b) binder]) cannot be
     defined directly. Instead, they are put together in the type ['a box].  It
     correspond to a term of type ['a] which free variables may be bound in the
@@ -198,16 +217,16 @@ val box_mbinder : ('b -> 'b box) -> ('a,'b) mbinder -> ('a,'b) mbinder box
 val unbox : 'a box -> 'a
 
 (** We can then easily define terms of the lambda-calculus as follows. {[
-    let id    : term = (* \x.x *)
+    let id    : term = (* λx.x *)
       let x = new_var "x" mkfree in
       unbox (abs x (var x))
 
-    let fst   : term = (* \x.\y.x *)
+    let fst   : term = (* λx.λy.x *)
       let x = new_var "x" mkfree in
       let y = new_var "y" mkfree in
       unbox (abs x (abs y (var x)))
 
-    let omega : term = (* (\x.(x) x) \x.(x) x *)
+    let omega : term = (* (λx.(x) x) λx.(x) x *)
       let x = new_var "x" mkfree in
       let delta = abs x (app (var x) (var x)) in
       unbox (app delta delta) ]} *)
@@ -285,7 +304,7 @@ module Lift2(M : Map2) :
 val hash_var  : 'a var -> int
 
 (** [compare_vars x y] safely compares [x] and [y].  Note that it is unsafe to
-    compare variables with [Pervasive.compare]. *)
+    compare variables using [Pervasive.compare]. *)
 val compare_vars : 'a var -> 'b var -> int
 
 (** [eq_vars x y] safely computes the equality of [x] and [y]. Note that it is
@@ -340,9 +359,6 @@ val mbinder_rank : ('a,'b) mbinder -> int
 
 (** [is_closed b] checks whether the [box] [b] is closed. *)
 val is_closed : 'a box -> bool
-
-(** [is_subst b] checks whether the [box] [b] was substituted. *)
-val is_substituted : (bool -> 'a) box -> 'a box
 
 (** [occur x b] tells whether variable [x] occurs in the [box] [b]. *)
 val occur : 'a var -> 'b box -> bool
