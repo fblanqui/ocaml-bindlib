@@ -492,7 +492,7 @@ let build_var : int ->  ('a var -> 'a) -> string -> 'a var =
 (** [new_var mkfree name] create a new free variable using a wrapping function
     [mkfree] and a default [name]. *)
 let new_var : ('a var -> 'a) -> string -> 'a var =
-  fun mkfree -> build_var (fresh_key ()) mkfree
+  fun mkfree s -> build_var (fresh_key ()) mkfree s
 
 (** [new_mvar mkfree names] creates an array of new free variables in the same
     way as [new_var] does. *)
@@ -746,9 +746,12 @@ let unmbind : ('a,'b) mbinder -> 'a mvar * 'b = fun b ->
   (x, msubst b (Array.map b.mb_mkfree x))
 
 (** [unmbind2 mkfree f g] is similar to [unmbind mkfree f], but it substitutes
-    both [f] and [g] using the same fresh variables. *)
+    both [f] and [g] using the same fresh variables. Note that the two binders
+    must have the same arity. *)
 let unmbind2 : ('a,'b) mbinder -> ('a,'c) mbinder -> 'a mvar * 'b * 'c =
   fun b1 b2 ->
+    if mbinder_arity b1 <> mbinder_arity b2 then
+      invalid_arg "Arity missmatch in unmbind2";
     let xs = new_mvar b1.mb_mkfree (mbinder_names b1) in
     let vs = Array.map b1.mb_mkfree xs in
     (xs, msubst b1 vs, msubst b2 vs)
@@ -757,7 +760,9 @@ let unmbind2 : ('a,'b) mbinder -> ('a,'c) mbinder -> 'a mvar * 'b * 'c =
     They are first substituted with the same fresh variables, and then [eq] is
     called on the resulting terms. *)
 let eq_mbinder : 'b eq -> ('a,'b) mbinder eq = fun eq f g ->
-  f == g || let (_,t,u) = unmbind2 f g in eq t u
+  f == g ||
+    (mbinder_arity f = mbinder_arity g &&
+       let (_,t,u) = unmbind2 f g in eq t u)
 
 (** [box_binder f b] boxes the binder [b] using the boxing function [f].  Note
     that when [b] is closed, it is immediately boxed using the [box] function.

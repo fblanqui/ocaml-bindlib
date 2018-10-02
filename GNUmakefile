@@ -1,4 +1,4 @@
-VERSION    := 5.0.0
+VERSION    := 5.0.1
 OCAMLFIND  := ocamlfind
 OCAMLBUILD := ocamlbuild -quiet
 CFLAGS     := -cflags -w,A-4
@@ -69,7 +69,8 @@ clean:
 	$(OCAMLBUILD) -clean
 
 distclean: clean
-	rm -f *~ examples/*~ docs/*~ docs/ocamldoc/*~ META
+	find . -name "*~" -exec rm {} \;
+	rm -f META
 
 ## Documentation
 .PHONY: doc
